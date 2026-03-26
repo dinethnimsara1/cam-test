@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Cam Monitor</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f4f4f9; }
+    #video-container { margin-top: 20px; }
+    video { width: 100%; max-width: 600px; border: 3px solid #333; border-radius: 10px; background: #000; }
+    .box { background: white; padding: 20px; border-radius: 8px; display: inline-block; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); }
+    input[type="text"] { width: 80%; padding: 10px; margin-top: 10px; text-align: center; }
+    h3 { color: #333; }
+  </style>
+</head>
+<body>
+
+<div class="box" id="ui-box">
+  <h3 id="statusText">Connecting to server...</h3>
+
+  <div id="share-section" style="display: none;">
+    <p>Anik device ekata yawanna ona link eka:</p>
+    <input type="text" id="share-link" readonly>
+    <p style="color: red; font-size: 12px;">Link eka open karala 'Allow Camera' dunnama meke video eka wada karai.</p>
+  </div>
+</div>
+
+<div id="video-container">
+  <video id="remote-video" autoplay playsinline></video>
+</div>
+
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetId = urlParams.get('id');
+  const remoteVideo = document.getElementById('remote-video');
+  const statusText = document.getElementById('statusText');
+
+  // Initialize PeerJS
+  const peer = new Peer();
+
+  if (!targetId) {
+    // ==========================================
+    // VIEWER MODE (Oya link eka hadana paththa)
+    // ==========================================
+    peer.on('open', (id) => {
+      const shareUrl = window.location.href.split('?')[0] + "?id=" + id;
+      document.getElementById('share-link').value = shareUrl;
+      document.getElementById('share-section').style.display = "block";
+      statusText.innerText = "Waiting for the other device...";
+    });
+
+    // Call ekak aawama (anik kena link eka click karala cam on karama)
+    peer.on('call', (call) => {
+      call.answer(); // Call eka answer karanawa (ape cam eka ywanne na)
+      statusText.innerText = "Connected! Video is playing.";
+
+      call.on('stream', (remoteStream) => {
+        remoteVideo.srcObject = remoteStream; // Video eka play karanawa
+      });
+    });
+
+  } else {
+    // ==========================================
+    // SENDER MODE (Anik kena link eka click karama)
+    // ==========================================
+    document.getElementById('share-section').style.display = "none";
+    statusText.innerText = "Requesting camera access...";
+
+    // Cam permission illanawa
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then((stream) => {
+        statusText.innerText = "Camera On. Sending video...";
+        remoteVideo.srcObject = stream; // Eyage display eketath eya penna hadanawa (optional)
+        remoteVideo.muted = true; // Feedback loop eka nawaththanna
+
+        peer.on('open', () => {
+          // Oya lagata call eka gannawa video stream ekath ekka
+          peer.call(targetId, stream);
+        });
+      })
+      .catch((err) => {
+        statusText.innerText = "Camera permission denied!";
+        console.error("Failed to get local stream", err);
+      });
+  }
+</script>
+</body>
+</html>
